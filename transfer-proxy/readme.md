@@ -1,109 +1,106 @@
-## Rarible protocol Exchange smart contracts
+## Contratos inteligentes de troca de protocolo raro
 
-### Architecture
+### Arquitetura
 
-Rarible exchange smart contracts are built using openzeppelin's upgradeable smart contracts library. So the smart contract code can be updated to support new features, fix bugs etc.
+Contratos inteligentes de troca rara são construídos usando a biblioteca de contratos inteligentes atualizável do openzeppelin. Assim, o código do contrato inteligente pode ser atualizado para oferecer suporte a novos recursos, corrigir bugs etc.
 
-Smart contracts are heavily tested, tests are provided in the test folder.
+Os contratos inteligentes são fortemente testados, os testes são fornecidos na pasta de teste.
 
-Functionality is divided into parts (each responsible for the part of algorithm).
+A funcionalidade é dividida em partes (cada uma responsável pela parte do algoritmo).
 
-Essentially, ExchangeV2 is a smart contract for decentralized exchange of any assets presented on Ethereum (or EVM compatible) blockchain.
+Essencialmente, o ExchangeV2 é um contrato inteligente para troca descentralizada de quaisquer ativos apresentados no blockchain Ethereum (ou compatível com EVM).
 
-### Algorithms
+### Algoritmos
 
-Main function in the Exchange is matchOrders. It takes two orders (left and right), tries to match them and then fills if there is a match.
+A principal função no Exchange é matchOrders. Leva duas ordens (esquerda e direita), tenta combiná-las e depois preenche se houver uma correspondência.
 
-Logically, whole process can be divided into stages:
+Logicamente, todo o processo pode ser dividido em etapas:
 
-- order validation (check order parameters are valid and caller is authorized to execute the order)
-- asset mathing (check if assets from left and right order match, extract matching assets)
-- calculating fill (finding out what exact values should be filled. orders can be matched partly if one of the sides doesn't want to fill other order fully)
-- order execution (execute transfers, save fill of the orders if needed)
+- validação do pedido (verifique se os parâmetros do pedido são válidos e o chamador está autorizado a executar o pedido)
+- cálculo de ativos (verifique se os ativos da ordem esquerda e direita correspondem, extraia ativos correspondentes)
+- cálculo de preenchimento (descobrir quais valores exatos devem ser preenchidos. Os pedidos podem ser correspondidos parcialmente se um dos lados não quiser preencher totalmente o outro pedido)
+- execução de pedidos (executar transferências, salvar o preenchimento dos pedidos, se necessário)
 
-#### Domain model
+#### Modelo de domínio
 
-**Order**:
+**Pedido**:
 
-- **maker**: address 
-- **makeAsset**: Asset
-- **taker**: address (can be zero, then anyone can fill the order)
-- **takeAsset**: Asset
-- **salt**: uint (random number)
-- **start**: uint (before this date order can't be filled)
-- **end**: uint (after this date order can't be filled)
-- **dataType**: bytes4 (type of data type, usually hash of some string, e.g.: "v1", "v2")
-- **data**: bytes (generic data, can be anything, extendable part of the order)
+- **fabricante**: endereço
+- **criar ativo**: ativo
+- **taker**: endereço (pode ser zero, então qualquer um pode preencher o pedido)
+- **takeAsset**: Ativo
+- **sal**: uint (número aleatório)
+- **start**: uint (antes desta data o pedido não pode ser preenchido)
+- **end**: uint (após esta data o pedido não pode ser preenchido)
+- **dataType**: bytes4 (tipo de tipo de dados, geralmente hash de alguma string, por exemplo: "v1", "v2")
+- **dados**: bytes (dados genéricos, podem ser qualquer coisa, parte extensível do pedido)
 
-**Asset**:
+**De ativos**:
+- **assetType**: AssetType (define o tipo de ativo - ETH, token ERC20 específico, NFT ERC721 específico etc.)
+- **quantidade**: uint
 
-- **assetType**: AssetType (defines type of asset - ETH, specific ERC20 token, specific ERC721 NFT etc.)
-- **amount**: uint
+**Tipo de ativo**:
 
-**AssetType**:
+- **tp**: bytes4 (tipo de tipo de ativo: ETH, ERC20, ERC721 etc.)
+- **dados**: bytes (dados genéricos, descreve o tipo de ativo, por exemplo: endereço do token para ERC20, token + tokenId para ERC721)
 
-- **tp**: bytes4 (type of asset type: ETH, ERC20, ERC721 etc.)
-- **data**: bytes (generic data, describes asset type, eg: token address for ERC20, token + tokenId for ERC721)
+#### Validação do pedido
 
-#### Order validation
+- verificar a data de início/término dos pedidos
+- verifique se o tomador do pedido está em branco ou taker = order.taker
+- verificar se a ordem está assinada pelo seu emitente ou o emitente da ordem está executando a transação
+- se o fabricante do pedido for um contrato, a verificação ERC-1271 será realizada
 
-- check start/end date of the orders
-- check if taker of the order is blank or taker = order.taker
-- check if order is signed by its maker or maker of the order is executing the transaction
-- if maker of the order is a contract, then ERC-1271 check is performed
+TODO: atualmente, apenas pedidos off-chain são suportados, esta parte do contrato inteligente pode ser facilmente atualizada para oferecer suporte a livros de pedidos on-chain.
 
-TODO: currently, only off-chain orders are supported, this part of the smart contract ca be easily updated to support on-chain order books.
+#### Correspondência de ativos
 
-#### Asset matching
+O objetivo disso é validar se **criar ativo** do pedido **esquerdo** corresponde a **obter ativo** do pedido **direito** e vice-versa.
+Novos tipos de ativos podem ser adicionados sem atualização de contrato inteligente. Isso é feito usando IAssetMatcher personalizado.
 
-Purpose of this is to validate that **make asset** of the **left** order matches **take asset** from the **right** order and vice versa.
-New types of assets can be added without smart contract upgrade. This is done using custom IAssetMatcher.
+Há possíveis melhorias no protocolo usando esses correspondentes personalizados:
 
-There are possible improvements to protocol using these custom matchers:
+- suporte para ativos paramétricos. Por exemplo, o usuário pode colocar ordem para trocar 10ETH para qualquer NFT de coleção popular.
+- suporte para pacotes NFT
 
-- support for parametric assets. For example, user can put order to exchange 10ETH to any NFT from popular collection.
-- support for NFT bundles
+#### Execução da ordem
 
-#### Order execution
+A execução da ordem é feita pelo TransferManager. Existem 2 variantes:
 
-Order execution is done by TransferManager. There are 2 variants:
+- SimpleTransferManager (simplesmente transfere ativos de maker para taker e vice-versa)
+- RaribleTransferManager (versão sofisticada, leva em conta comissões de protocolo, royalties etc)
 
-- SimpleTransferManager (it simply transfers assets from maker to taker and vice versa)
-- RaribleTransferManager (sophisticated version, it takes in account protocol commissions, royalties etc)
+TODO: Existem planos para estender o RaribleTransferManager para oferecer suporte a mais esquemas de royalties e adicionar novos recursos, como taxas personalizadas, vários beneficiários de pedidos.
 
-TODO: There are plans to extend RaribleTransferManager to support more royalty schemes and add new features like custom fees, multiple order beneficiaries.
+Essa parte do algoritmo pode ser estendida com ITransferExecutor personalizado. No futuro, novos executores serão adicionados para suportar novos tipos de ativos, por exemplo, executores para manipulação de pacotes configuráveis ​​podem ser adicionados.
 
-This part of the algorithm can be extended with custom ITransferExecutor. In future, new executors will be added to support new asset types, for example, executor for handling bundles can be added.
+TODO: possíveis melhorias:
 
-TODO: possible improvements:
+- pacotes de suporte
+- suporte caixas aleatórias
 
-- support bundles
-- support random boxes
+#### Honorários
 
-#### Fees
+RaribleTransferManager suporta estes tipos de taxas:
+- taxas de protocolo (são tomadas de ambos os lados do acordo)
+- taxas de origem (a taxa de origem e origem é definida para cada pedido. Pode ser diferente para dois pedidos envolvidos)
+- royalties (os autores da obra receberão parte de cada venda)
 
-RaribleTransferManager supports these types of fees:
-- protocol fees (are taken from both sides of the deal)
-- origin fees (origin and origin fee is set for every order. it can be different for two orders involved)
-- royalties (authors of the work will receive part of each sale)
+##### Cálculo de taxas, lado da taxa
 
-##### Fees calculation, fee side
+Para receber uma taxa, precisamos calcular que lado do negócio pode ser usado como dinheiro.
+Existe um algoritmo simples para fazer isso:
+- se o ETH for de qualquer lado do negócio, é usado
+- se não, então se o ERC-20 estiver no acordo, ele é usado
+- se não, então se ERC-1155 estiver no negócio, é usado
+- caso contrário, a taxa não é cobrada (por exemplo, dois ERC-721 estão envolvidos no negócio)Quando estabelecemos que parte do negócio pode ser tratada como dinheiro, podemos estabelecer que
+- comprador é o lado do negócio que possui dinheiro
+- o vendedor é o outro lado do negócio
 
-To take a fee we need to calculate, what side of the deal can be used as money.
-There is a simple algorithm to do it:
-- if ETH is from any side of the deal, it's used
-- if not, then if ERC-20 is in the deal, it's used
-- if not, then if ERC-1155 is in the deal, it's used
-- otherwise, fee is not taken (for example, two ERC-721 are involved in the deal)
+Em seguida, o valor total do ativo (lado do dinheiro) deve ser calculado
+- taxa de protocolo é adicionada ao valor preenchido
+- a taxa de origem do pedido do comprador também é adicionada
 
-When we established, what part of the deal can be treated as money, then we can establish, that
-- buyer is side of the deal who owns money
-- seller is other side of the deal
+Se o comprador estiver usando o token ERC-20 para pagamento, ele deverá aprovar pelo menos essa quantidade calculada de tokens.
 
-Then total amount of the asset (money side) should be calculated
-- protocol fee is added on top of the filled amount
-- origin fee of the buyer's order is added on top too
-
-If buyer is using ERC-20 token for payment, then he must approve at least this calculated amount of tokens.
-
-If buyer is using ETH, then he must send this calculated amount of ETH with the tx.
+Se o comprador estiver usando ETH, ele deverá enviar essa quantidade calculada de ETH com o tx.
