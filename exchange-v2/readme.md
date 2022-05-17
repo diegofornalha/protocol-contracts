@@ -1,139 +1,138 @@
-## Rarible protocol Exchange smart contracts
+## Contratos inteligentes de troca de protocolo raro
 
-### Architecture
+### Arquitetura
 
-Rarible exchange smart contracts are built using openzeppelin's upgradeable smart contracts library. So the smart contract code can be updated to support new features, fix bugs etc.
+Contratos inteligentes de troca rara são construídos usando a biblioteca de contratos inteligentes atualizável do openzeppelin. Assim, o código do contrato inteligente pode ser atualizado para oferecer suporte a novos recursos, corrigir bugs etc.
 
-Smart contracts are heavily tested, tests are provided in the test folder.
+Os contratos inteligentes são fortemente testados, os testes são fornecidos na pasta de teste.
 
-Functionality is divided into parts (each responsible for the part of algorithm).
+A funcionalidade é dividida em partes (cada uma responsável pela parte do algoritmo).
 
-Essentially, ExchangeV2 is a smart contract for decentralized exchange of any assets presented on Ethereum (or EVM compatible) blockchain.
+Essencialmente, o ExchangeV2 é um contrato inteligente para troca descentralizada de quaisquer ativos apresentados no blockchain Ethereum (ou compatível com EVM).
 
-### Algorithms
+### Algoritmos
 
-Main function in the Exchange is matchOrders. It takes two orders (left and right), tries to match them and then fills if there is a match.
+A principal função no Exchange é matchOrders. Leva duas ordens (esquerda e direita), tenta combiná-las e depois preenche se houver uma correspondência.
 
-Logically, whole process can be divided into stages:
+Logicamente, todo o processo pode ser dividido em etapas:
 
-- order validation (check order parameters are valid and caller is authorized to execute the order)
-- asset matching (check if assets from left and right order match, extract matching assets)
-- calculating fill (finding out what exact values should be filled. orders can be matched partly if one of the sides doesn't want to fill other order fully)
-- order execution (execute transfers, save fill of the orders if needed)
+- validação do pedido (verifique se os parâmetros do pedido são válidos e o chamador está autorizado a executar o pedido)
+- correspondência de ativos (verifique se os ativos da ordem esquerda e direita correspondem, extraia ativos correspondentes)
+- cálculo de preenchimento (descobrir quais valores exatos devem ser preenchidos. Os pedidos podem ser correspondidos parcialmente se um dos lados não quiser preencher totalmente o outro pedido)
+- execução de pedidos (executar transferências, salvar o preenchimento dos pedidos, se necessário)
 
-#### Domain model
+#### Modelo de domínio
 
-**Order**:
+**Pedido**:
 
-- `address` maker
-- `Asset` leftAsset (see [LibAsset](../asset/contracts/LibAsset.md))
-- `address` taker (can be zero address)
-- `Asset` rightAsset (see [LibAsset](../asset/contracts/LibAsset.md))
-- `uint` salt - random number to distinguish different maker's Orders (if salt = 0, then transaction should be executed by order.maker. then fill of the order is not saved)
-- `uint` start - Order can't be matched before this date (optional)
-- `uint` end - Order can't be matched after this date (optional)
-- `bytes4` dataType - type of data, usually hash of some string, e.g.: "v1", "v2" (see more [here](./contracts/LibOrderData.md))
-- `bytes` data - generic data, can be anything, extendable part of the order (see more [here](./contracts/LibOrderData.md))
+- fabricante de `endereço`
+- `Asset` leftAsset (consulte [LibAsset](../asset/contracts/LibAsset.md))
+- tomador `address` (pode ser endereço zero)
+- `Asset` rightAsset (consulte [LibAsset](../asset/contracts/LibAsset.md))
+- `uint` salt - número aleatório para distinguir diferentes ordens do fabricante (se salt = 0, então a transação deve ser executada pelo order.maker. então o preenchimento do pedido não é salvo)
+- `uint` start - O pedido não pode ser correspondido antes desta data (opcional)
+- `uint` end - O pedido não pode ser correspondido após esta data (opcional)
+- `bytes4` dataType - tipo de dados, geralmente hash de alguma string, por exemplo: "v1", "v2" (veja mais [aqui](./contracts/LibOrderData.md))
+- dados `bytes` - dados genéricos, podem ser qualquer coisa, parte extensível do pedido (veja mais [aqui](./contracts/LibOrderData.md))
 
-#### Order execution
+#### Execução da ordem
 
-When user signs the order he states the following: 
+Quando o usuário assina o pedido, ele afirma o seguinte:
 
-I would like to exchange my asset (make), up to make asset value, in return I would like to get take asset, not more than take value. Orders can be filled partly, but in this case rate of the exchange should be the same or should be more profitable for me.
+Eu gostaria de trocar meu ativo (make), até fazer valor de ativo, em troca gostaria de pegar ativo, não mais que tirar valor. As ordens podem ser preenchidas parcialmente, mas neste caso a taxa de câmbio deve ser a mesma ou deve ser mais lucrativa para mim.
 
-This means:
-- user can give less than make.value
-- user can't receive more than take.value (order is filled when user gets what he wants to receive)
+Isso significa:
+- o usuário pode dar menos que make.value
+- o usuário não pode receber mais do que take.value (o pedido é preenchido quando o usuário recebe o que deseja receber)
 
-Fill of the order is saved inside smart contract and it relates to the take order part. Fill is stored inside mapping, where key is calculated using these fields: maker, make asset type, take asset type, salt. It means, fill of the orders which differ only in exchange rate, are stored in the same mapping slot.
+O preenchimento do pedido é salvo dentro do contrato inteligente e está relacionado à parte de recebimento do pedido. Fill é armazenado dentro do mapeamento, onde a chave é calculada usando estes campos: maker, make asset type, take asset type, salt. Ou seja, o preenchimento dos pedidos que diferem apenas na taxa de câmbio são armazenados no mesmo slot de mapeamento.
 
-Also, orders which are fully filled, can be extended: users can sign new orders using the same salt (they can increase make.value and take.value for example).
+Além disso, os pedidos que estão totalmente preenchidos podem ser estendidos: os usuários podem assinar novos pedidos usando o mesmo sal (eles podem aumentar make.value e take.value, por exemplo).
 
-Order rate priority: if rates for the exchange differ, but orders can be filled (for example, left order is 10X -> 100Y, but right is 100Y -> 5X), then left order dictates exchange rate.
+Prioridade da taxa de pedido: se as taxas de câmbio forem diferentes, mas os pedidos puderem ser preenchidos (por exemplo, o pedido esquerdo é 10X -> 100Y, mas o direito é 100Y -> 5X), então o pedido esquerdo determina a taxa de câmbio.
 
-Rounding errors: to calculate fill amounts, mathematical operations are used. When rounding is performed and error is more than 0.1%, rounding error will be thrown and order can't be executed.
+Erros de arredondamento: para calcular os valores de preenchimento, são utilizadas operações matemáticas. Quando o arredondamento é realizado e o erro é superior a 0,1%, o erro de arredondamento será lançado e a ordem não poderá ser executada.
 
-#### Order validation
+#### Validação do pedido
 
-- check start/end date of the orders
-- check if taker of the order is blank or taker = order.taker
-- check if order is signed by its maker or maker of the order is executing the transaction
-- if maker of the order is a contract, then ERC-1271 check is performed
+Além disso, os pedidos que estão totalmente preenchidos podem ser pedidos estendidos: os mesmos usuários podem aumentar.
 
-TODO: currently, only off-chain orders are supported, this part of the smart contract can be easily updated to support on-chain order books.
+Prioridade de taxa de pedido: se as taxas de câmbio são diferentes, mas os pedidos podem ser preenchidos esquerdos (exemplo, o pedido é 10X -> 100Y, mas o direito é 100Y -> 5X), então o pedido determina a taxa de câmbio.
 
-#### Asset matching
+Erros de arredondamento: para valores utilizados, operações matemáticas. Quando o arredondamento for superior a 0,1%, o erro será lançado e a ordem de arredondamento não poderá ser entregue o erro realizado.
 
-Purpose of this is to validate that **make asset** of the **left** order matches **take asset** from the **right** order and vice versa.
-New types of assets can be added without smart contract upgrade. This is done using custom IAssetMatcher.
+#### Validação do pedido
 
-There are possible improvements to protocol using these custom matchers:
+O objetivo disso é validar se **criar ativo** do pedido **esquerdo** corresponde a **obter ativo** do pedido **direito** e vice-versa.
+Novos tipos de ativos podem ser adicionados sem atualização de contrato inteligente. Isso é feito usando IAssetMatcher personalizado.
 
-- support for parametric assets. For example, user can put order to exchange 10ETH to any NFT from popular collection.
-- support for NFT bundles
+Há possíveis melhorias no protocolo usando esses correspondentes personalizados:
 
-#### Transfers execution
+- suporte para ativos paramétricos. Por exemplo, o usuário pode colocar ordem para trocar 10ETH para qualquer NFT de coleção popular.
+- suporte para pacotes NFT
 
-Transfers are done by TransferManager. There are 2 variants:
+#### Execução de transferências
 
-- SimpleTransferManager (it simply transfers assets from maker to taker and vice versa)
-- RaribleTransferManager (sophisticated version, it takes in account protocol commissions, royalties etc)
+As transferências são feitas pelo TransferManager. Existem 2 variantes:
 
-TODO: There are plans to extend RaribleTransferManager to support more royalty schemes and add new features like custom fees, multiple order beneficiaries.
+- SimpleTransferManager (simplesmente transfere ativos de maker para taker e vice-versa)
+- RaribleTransferManager (versão sofisticada, leva em conta comissões de protocolo, royalties etc)
 
-This part of the algorithm can be extended with custom ITransferExecutor. In future, new executors will be added to support new asset types, for example, executor for handling bundles can be added.
 
-TODO: possible improvements:
+TODO: Existem planos para estender o RaribleTransferManager para oferecer suporte a mais esquemas de royalties e adicionar novos recursos, como taxas personalizadas, vários beneficiários de pedidos.
 
-- support bundles
-- support random boxes
+Essa parte do algoritmo pode ser estendida com ITransferExecutor personalizado. No futuro, novos executores serão adicionados para suportar novos tipos de ativos, por exemplo, executores para manipulação de pacotes configuráveis ​​podem ser adicionados.
 
-#### Executing ETH transfers
+TODO: possíveis melhorias:
 
-Makers of the orders and addresses in payouts field in `order.data` can be contracts. So, these contracts should have payable fallback functions to accept incoming ETH transfers. In other cases tx will fail.
+- pacotes de suporte
+- suporte caixas aleatórias
 
-The same applies to origin field, royalties receivers.
+#### Executando transferências ETH
 
-#### Fees
+Os fabricantes dos pedidos e endereços no campo de pagamentos em `order.data` podem ser contratos. Portanto, esses contratos devem ter funções de fallback pagáveis ​​para aceitar transferências ETH recebidas. Em outros casos, o tx falhará.
 
-RaribleTransferManager supports these types of fees:
-- protocol fees (are taken from both sides of the deal)
-- origin fees (origin and origin fee is set for every order. it can be different for two orders involved)
-- royalties (authors of the work will receive part of each sale)
+O mesmo se aplica ao campo de origem, receptores de royalties.
 
-Royalties of the item can not be more than 30% for security reasons. If royalties are more than 30%, transaction is reverted.
+#### Honorários
 
-##### Fees calculation, fee side
+RaribleTransferManager suporta estes tipos de taxas:
+- taxas de protocolo (são tomadas de ambos os lados do acordo)
+- taxas de origem (a taxa de origem e origem é definida para cada pedido. Pode ser diferente para dois pedidos envolvidos)
+- royalties (os autores da obra receberão parte de cada venda)
 
-To take a fee we need to calculate, what side of the deal can be used as money.
-There is a simple algorithm to do it:
-- if ETH is from any side of the deal, it's used
-- if not, then if ERC-20 is in the deal, it's used
-- if not, then if ERC-1155 is in the deal, it's used
-- otherwise, fee is not taken (for example, two ERC-721 are involved in the deal)
+Os royalties do item não podem ser superiores a 30% por motivos de segurança. Se os royalties forem superiores a 30%, a transação é revertida.
 
-When we established, what part of the deal can be treated as money, then we can establish, that
-- buyer is side of the deal who owns money
-- seller is other side of the deal
+##### Cálculo de taxas, lado da taxa
 
-Then total amount of the asset (money side) should be calculated
-- protocol fee is added on top of the filled amount
-- origin fee of the buyer's order is added on top too
+Para receber uma taxa, precisamos calcular que lado do negócio pode ser usado como dinheiro.
+Existe um algoritmo simples para fazer isso:
+- se o ETH for de qualquer lado do negócio, é usado
+- se não, então se o ERC-20 estiver no acordo, ele é usado
+- se não, então se ERC-1155 estiver no negócio, é usado
+- caso contrário, a taxa não é cobrada (por exemplo, dois ERC-721 estão envolvidos no negócio)
+- Quando estabelecemos que parte do negócio pode ser tratada como dinheiro, podemos estabelecer que
+- comprador é o lado do negócio que possui dinheiro
+- o vendedor é o outro lado do negócio
 
-If buyer is using ERC-20 token for payment, then he must approve at least this calculated amount of tokens.
+Em seguida, o valor total do ativo (lado do dinheiro) deve ser calculado
+- taxa de protocolo é adicionada ao valor preenchido
+- a taxa de origem do pedido do comprador também é adicionada
 
-If buyer is using ETH, then he must send this calculated amount of ETH with the tx.
+Se o comprador estiver usando o token ERC-20 para pagamento, ele deverá aprovar pelo menos essa quantidade calculada de tokens.
 
-##### Cancelling the order
+Se o comprador estiver usando ETH, ele deverá enviar essa quantidade calculada de ETH com o tx.
 
-cancel function can be used to cancel order. Such orders won't be matched and error will be thrown. This function is used by order maker to mark orders unfillable. This function can be invoked only by order maker.
+##### Cancelando o pedido
 
-TODO: there is possibility to change authorization for cancel function - add authorization by signature. Possibly, this will be added in the future.
+A função cancelar pode ser usada para cancelar o pedido. Esses pedidos não serão correspondidos e um erro será lançado. Esta função é usada pelo fabricante de pedidos para marcar pedidos não preenchíveis. Esta função pode ser invocada apenas pelo fabricante do pedido.
 
-##### Contract events
+TODO: existe a possibilidade de alterar a autorização para a função de cancelamento - adicionar autorização por assinatura. Possivelmente, isso será adicionado no futuro.
 
-ExchangeV2 contract emits these events:
-- Match (when orders are matched)
-- Cancel (when user cancels the order)
+##### Eventos de contrato
 
-TODO: currently, there are no indexed fields in events, because rarible protocol uses internal indexing. Possibly, indexed fields will be added in future.  
+O contrato ExchangeV2 emite estes eventos:
+- Match (quando os pedidos são combinados)
+- Cancelar (quando o usuário cancela o pedido)
+
+TODO: atualmente, não há campos indexados em eventos, pois o protocolo rarible utiliza indexação interna. Possivelmente, campos indexados serão adicionados no futuro.
