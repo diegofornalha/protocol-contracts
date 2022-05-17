@@ -1,63 +1,64 @@
-# Smart contracts for Rarible Protocol
+# Contratos inteligentes para protocolo Rarible
 
-Consists of:
+Consiste em:
 
-* Exchange v2: responsible for sales, auctions etc.
-* Tokens: for storing information about NFTs
-* Specifications for on-chain royalties supported by Rarible
+* Exchange v2: responsável por vendas, leilões etc..
+* Tokens: para armazenar informações sobre NFTs
+* Especificações para royalties on-chain suportadas pela Rarible
 
-See more information about Rarible Protocol at [docs.rarible.org](https://docs.rarible.org).
+Veja mais informações sobre Rarible Protocol em [docs.rarible.org](https://docs.rarible.org).
 
-Also, you can find Rarible Smart Contracts deployed instances across Mainnet, Testnet and Development at [Contract Addresses](https://docs.rarible.org/reference/contract-addresses/) page.
+Além disso, você pode encontrar instâncias implantadas do Rarible Smart Contracts na Mainnet, Testnet e Development em [Contract Addresses](https://docs.rarible.org/reference/contract-addresses/) página.
 
-## Compile, Test, Deploy
+## Compilar, testar, implantar
 
 ```shell
 yarn
 yarn bootstrap
 ```
 
-then use truffle to compile, test: cd into directory and then
+então use truffle para compilar, teste: cd no diretório e então
 
 ```shell
 truffle test --compile-all
 ```
 
-## Protocol overview
+## Visão geral do protocolo
 
-Rarible protocol is a combination of smart-contracts for exchanging tokens, tokens themselves, APIs for order creation, discovery, standards used in smart contracts.
+O protocolo Rarible é uma combinação de contratos inteligentes para troca de tokens, tokens próprios, APIs para criação de pedidos, descoberta, padrões usados ​​em contratos inteligentes.
 
-The Protocol is primarily targeted to NFTs, but it's not limited to NFTs only. Any asset on EVM blockchain can be traded on Rarible.
+O protocolo é direcionado principalmente para NFTs, mas não se limita apenas a NFTs. Qualquer ativo na blockchain EVM pode ser negociado na Rarible.
 
-Smart contracts are constructed in the way to be upgradeable, orders have versioning information, so new fields can be added if needed in the future.
+Os contratos inteligentes são construídos de forma a serem atualizados, os pedidos têm informações de versão, para que novos campos possam ser adicionados, se necessário, no futuro.
 
-## Trade process overview
+## Visão geral do processo de negociação
 
-Users should do these steps to successfully trade on Rarible:
+Os usuários devem seguir estas etapas para negociar com sucesso no Rarible:
 
-* Approve transfers for their assets to Exchange contracts (e.g.: call approveForAll for ERC-721, approve for ERC-20) — amount of money needed for trade is price + fee on top of that. Learn more at exchange contracts [README](https://github.com/rarible/protocol-contracts/tree/master/exchange-v2).
-* Sign trading order via preferred wallet (order is like a statement "I would like to sell my precious crypto kitty for 10 ETH").
-* Save this order and signature to the database using Rarible protocol API (in the future, storing orders on-chain will be supported too).
+* Aprovar downloads de seus ativos para contratos de câmbio (por exemplo, aprovarForAll para ERC-721, aprovar para ERC-20) — quantidade de dinheiro necessária para o comércio é preço + taxa em cima disso. Saiba mais em contratos de câmbio [README](https://github.com/rarible/protocol-contracts/tree/master/exchange-v2).
+* Assine o pedido de negociação através da carteira preferida (o pedido é como uma declaração "Gostaria de vender meu precioso gatinho criptográfico por10 ETH").
+* Salve este pedido e assinatura no banco de dados usando a API do protocolo Rarible (no futuro, o armazenamento de pedidos na cadeia também será suportado).
 
-If the user wants to cancel the order, he must call cancel function of the Exchange smart contract.
+Se o usuário quiser cancelar o pedido, ele deve chamar a função de cancelamento do contrato inteligente do Exchange.
 
-Users who want to purchase something on Rarible should do the following:
+Os usuários que desejam comprar algo no Rarible devem fazer o seguinte:
 
 * Find an asset they like with an open order.
-* Approve transfers the same way (if not buying using Ether).
-* Form order in the other direction (statement like "I would like to buy precious crypto kitty for 10 ETH").
-* Call Exchange.matchOrders with two orders and first order signature. 
+* Aprovar transferências da mesma forma (se não comprar usando Ether).
+* Faça o pedido na outra direção (declaração como "Eu gostaria de comprar um precioso gatinho de criptografia para 10 ETH").
+* Chame Exchange.matchOrders com dois pedidos e assinatura do primeiro pedido.
 
-## Suggestions
+## Sugestões
 
-You are welcome to [suggest features](https://github.com/rarible/protocol/discussions) and [report bugs found](https://github.com/rarible/protocol/issues)!
+Você é bem vindo para [suggest features](https://github.com/rarible/protocol/discussions) 
+e [report bugs found](https://github.com/rarible/protocol/issues)!
 
-## Contributing
+## Contribuindo
 
-The codebase is maintained using the "contributor workflow" where everyone without exception contributes patch proposals using "pull requests" (PRs). This facilitates social contribution, easy testing, and peer review.
+A base de código é mantida usando o "fluxo de trabalho do contribuidor", onde todos, sem exceção, contribuem com propostas de patch usando "requisições pull" (PRs). Isso facilita a contribuição social, testes fáceis e revisão por pares.
 
-See more information on [CONTRIBUTING.md](https://github.com/rarible/protocol/blob/main/CONTRIBUTING.md).
+Veja mais informações em [CONTRIBUTING.md](https://github.com/rarible/protocol/blob/main/CONTRIBUTING.md).
 
-## License
+## Licença
 
-Smart contracts for Rarible protocol are available under the [MIT License](LICENSE.md).
+Contratos inteligentes para o protocolo Rarible estão disponíveis sob o [MIT License](LICENSE.md).
